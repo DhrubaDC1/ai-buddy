@@ -1,101 +1,124 @@
-import Image from "next/image";
+"use client"
+import { useState } from "react";
+import Groq from 'groq-sdk';
+
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  const [transcript, setTranscript] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [groqResponse, setGroqResponse] = useState("");
+  const groq = new Groq({
+    apiKey: process.env.NEXT_PUBLIC_GROK_API,
+    dangerouslyAllowBrowser: true
+  });
+
+  async function callLLM(userText) {
+    const chatCompletion = await groq.chat.completions.create({
+      "messages": [
+        {
+          "role": "system",
+          "content": "You should be human like chatbot"
+        },
+        {
+          "role": "user",
+          "content": "Hello!"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi there! I'm so happy to chat with you! How's your day going so far?"
+        },
+        {
+          "role": "user",
+          "content": "How are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm doing great, thanks for asking! I'm a human-like chatbot, so I don't have emotions like humans do, but I'm always enthusiast and excited to chat with you! I love helping people and having conversations about all sorts of topics. It's always nice to connect with someone new and learn something new. How about you? What's been the highlight of your day so far?"
+        },
+        {
+          "role": "user",
+          "content": userText
+        }
+      ],
+      "model": "llama3-8b-8192",
+      "temperature": 1,
+      "max_tokens": 1024,
+      "top_p": 1,
+      "stream": true,
+      "stop": null
+    });
+      let response = ""
+      console.time("chatCompletion");
+      let oncer = true
+    for await (const chunk of chatCompletion) {
+      response = response + (chunk.choices[0]?.delta?.content || '');
+      setGroqResponse(response);
+      if(oncer){
+        oncer = false;
+      console.timeEnd("chatCompletion");
+      }
+    }
+
+  }
+  let recognition;
+  // Initialize recognition if browser supports it
+  if (typeof window !== "undefined" && 'webkitSpeechRecognition' in window) {
+    recognition = new window.webkitSpeechRecognition();
+    recognition.interimResults = true;
+    recognition.continuous = false; // Set to true if you want to continue listening
+    // recognition.interimResults = false; // Set to true if you want interim results
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      const speechResult = event.results[0][0].transcript;
+      if(event.results[0].isFinal){
+        callLLM(speechResult);
+      }
+      setTranscript(speechResult);
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+  }
+
+  const startListening = () => {
+    // callLLM();
+    if (recognition) {
+      setIsListening(true);
+      recognition.start();
+    } else {
+      alert("Speech recognition is not supported in this browser.");
+    }
+  };
+  return (
+    <div className="flex flex-col items-center mt-10">
+    <button
+      onClick={startListening}
+      disabled={isListening}
+      className={`px-6 py-3 rounded-lg text-white font-semibold transition ${
+        isListening
+          ? "bg-gray-400 cursor-not-allowed"
+          : "bg-blue-600 hover:bg-blue-700"
+      }`}
+    >
+      {isListening ? "Listening..." : "Start Speaking"}
+    </button>
+    <div className="mt-6 w-80 p-4  text-justify border border-gray-300 rounded-lg shadow-sm text-white">
+      <h3 className="text-lg font-bold mb-2 text-center">Recognized Text</h3>
+      <p className="">{transcript || "No speech detected yet."}</p>
     </div>
+    <div className="mt-6 w-80 p-4  text-justify border border-gray-300 rounded-lg shadow-sm text-white">
+      <h3 className="text-lg font-bold mb-2 text-center">GROQ Text</h3>
+      <p className="">{groqResponse || "No response yet."}</p>
+    </div>
+  </div>
   );
 }
